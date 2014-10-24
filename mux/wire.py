@@ -134,10 +134,13 @@ class Packet(object):
 
   @classmethod
   def decode(cls, buf):
+    if not isinstance(buf, bytearray):
+      raise TypeError('Packet.decode requires buffer of type bytearray.')
+
     if len(buf) < 4:
       raise ValueError('Buffer insufficient size for message.')
 
-    typ, = struct.unpack('b', buf[0])
+    typ = buf[0]
     tag, = struct.unpack('>I', b'\x00' + buf[1:4])
 
     impl = cls.IMPLS.get(typ)
@@ -155,7 +158,10 @@ class Packet(object):
     self.tag = tag
 
   def encode_header(self, message_type):
-    return struct.pack('b', message_type) + struct.pack('>I', self.tag)[1:]
+    return bytearray().join([
+        struct.pack('b', message_type),
+        struct.pack('>I', self.tag)[1:]
+    ])
 
   def encode(self):
     raise NotImplemented
@@ -198,7 +204,7 @@ class Treq(Packet):
     else:
       kvs = []
 
-    return b''.join([
+    return bytearray().join([
       self.encode_header(Message.T_REQ),
       self.encode_kvs(kvs),
       self.body
@@ -212,7 +218,7 @@ class Rreq(Packet):
     self.body = body
 
   def encode(self):
-    return b''.join([
+    return bytearray().join([
       self.encode_header(Message.R_REQ),
       struct.pack('B', self.status),
       self.body,
@@ -240,7 +246,7 @@ class Tdispatch(Packet):
     self.contexts, self.dst, self.dtab, self.body = contexts, dst, dtab, body
 
   def encode(self):
-    return b''.join([
+    return bytearray().join([
       self.encode_header(Message.T_DISPATCH),
       Fragment.encode_contexts(self.contexts),
       Fragment.encode_s2(self.dst),
@@ -255,7 +261,7 @@ class Rdispatch(Packet):
     self.status, self.contexts, self.body = status, contexts, body
 
   def encode(self):
-    return b''.join([
+    return bytearray().join([
       self.encode_header(Message.R_DISPATCH),
       struct.pack('B', self.status),
       Fragment.encode_contexts(self.contexts),
@@ -346,7 +352,7 @@ class Tlease(Packet):
     self.unit, self.length = unit, length
 
   def encode(self):
-    return b''.join([
+    return bytearray().join([
         self.encode_header(Message.T_LEASE),
         struct.pack('B', self.unit),
         struct.pack('>Q', self.length)
