@@ -1,6 +1,6 @@
 from mux.wire import (
     Packet,
-    Rdispatch,
+    RdispatchOk,
     Rdrain,
     Rerr,
     Rping,
@@ -19,7 +19,8 @@ import pytest
 SHORT_MAX = 2 ** 24 - 1
 
 
-def test_tlease():
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_tlease(tag):
   pass
 
 
@@ -39,33 +40,55 @@ def test_rerr(tag):
   assert msg.error == msg2.error
 
 
-def test_rping():
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_rping(tag):
+  msg = Rping(tag)
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+
+
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_tping(tag):
+  msg = Tping(tag)
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+
+
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_rdrain(tag):
+  msg = Rdrain(tag)
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+
+
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_tdrain(tag):
+  msg = Tdrain(tag)
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+
+
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_rdispatch(tag):
+  msg = RdispatchOk(tag, (('foo', 'bar'),), 'baz')
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+  assert msg.status == msg2.status
+  assert msg.contexts == msg2.contexts
+  assert msg.body == msg2.body
+
+
+
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_tdispatch(tag):
   pass
 
 
-def test_tping():
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_treq(tag):
   pass
 
 
-def test_rdrain():
-  pass
-
-
-def test_tdrain():
-  pass
-
-
-def test_rdispatch():
-  pass
-
-
-def test_tdispatch():
-  pass
-
-
-def test_treq():
-  pass
-
-
-def test_rreq():
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_rreq(tag):
   pass

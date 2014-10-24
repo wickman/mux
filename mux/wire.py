@@ -128,6 +128,27 @@ class Fragments(object):
     return struct.pack('>H', len(contexts)) + b''.join(
         cls.encode_context(k, v) for (k, v) in contexts)
 
+  @classmethod
+  def decode_context(cls, body):
+    key_len, = struct.unpack('>H', body[0:2])
+    key = body[2:key_len + 2].decode('utf-8')
+    value_len, = struct.unpack('>H', body[key_len + 2:key_len + 4])
+    value = body[key_len + 4:key_len + 4 + value_len].decode('utf-8')
+    return key_len + value_len + 4, (key, value)
+
+  @classmethod
+  def decode_contexts(cls, body):
+    num_contexts, = struct.unpack('>H', body[0:2])
+    contexts = []
+
+    offset = 2
+    for _ in range(num_contexts):
+      consumed, (k, v) = cls.decode_context(body[offset:])
+      offset += consumed
+      contexts.append((k, v))
+
+    return offset, contexts
+
 
 class Packet(object):
   IMPLS = {}
@@ -301,7 +322,7 @@ class Tdispatch(Packet):
 
   def __init__(self, tag, contexts, dst, dtab, body):
     super(Tdispatch, self).__init__(tag)
-    self.contexts, self.dst, self.dtab, self.body = contexts, dst, dtab, body
+    self.contexts, self.dst, self.dtab, self.body = tuple(contexts), dst, dtab, body
 
   def encode(self):
     return bytearray().join([
@@ -328,7 +349,7 @@ class Rdispatch(Packet):
 
   def __init__(self, tag, status, contexts, body):
     super(Rdispatch, self).__init__(tag)
-    self.status, self.contexts, self.body = status, contexts, body
+    self.status, self.contexts, self.body = status, tuple(contexts), body
 
   def encode(self):
     return bytearray().join([
