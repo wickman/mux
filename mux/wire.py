@@ -141,12 +141,21 @@ class Packet(object):
       raise ValueError('Buffer insufficient size for message.')
 
     typ = buf[0]
+
+    # twos compliment conversion
+    if 0 <= typ < 128:
+      pass
+    elif 128 <= typ < 256:
+      typ -= 256
+    else:
+      raise ValueError('Invalid message type: %s' % typ)
+
     tag, = struct.unpack('>I', b'\x00' + buf[1:4])
 
     impl = cls.IMPLS.get(typ)
 
     if impl is None:
-      raise ValueError('Unknown Tmessage 0x%x with tag 0x%x' % (typ, tag))
+      raise ValueError('Unknown Tmessage (%d) 0x%x with tag 0x%x' % (typ, typ, tag))
 
     return impl.decode_body(tag, buf[4:])
 

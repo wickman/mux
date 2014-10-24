@@ -13,20 +13,30 @@ from mux.wire import (
     Treq,
 )
 
+import pytest
+
+
+SHORT_MAX = 2 ** 24 - 1
+
 
 def test_tlease():
   pass
 
 
-def test_tdiscarded():
-  msg = Tdiscarded(31337, 'horfgorf')
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_tdiscarded(tag):
+  msg = Tdiscarded(tag, 'horfgorf')
   msg2 = Packet.decode(msg.encode())
   assert msg.tag == msg2.tag
   assert msg.why == msg2.why
 
 
-def test_rerr():
-  pass
+@pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
+def test_rerr(tag):
+  msg = Rerr(tag, 'morfgorf')
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+  assert msg.error == msg2.error
 
 
 def test_rping():
