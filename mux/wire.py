@@ -148,7 +148,11 @@ class Packet(object):
     if impl is None:
       raise ValueError('Unknown Tmessage 0x%x with tag 0x%x' % (typ, tag))
 
-    return impl.decode(buf[4:], tag)
+    return impl.decode_body(tag, buf[4:])
+
+  @classmethod
+  def decode_body(cls, tag, body):
+    raise NotImplemented
 
   @classmethod
   def register(cls, typ, impl):
@@ -180,8 +184,36 @@ class Treq(Packet):
     return struct.pack('B', len(kvs)) + b''.join(cls.encode_kv(kv) for kv in kvs)
 
   @classmethod
-  def decode(cls, buf):
-    pass
+  def decode_kv(cls, kv):
+    key = kv[0]
+    value_len = kv[1]
+    return value_len + 2, (key, kv[2:value_len + 2])
+
+  @classmethod
+  def decode_kvs(cls, body):
+    offset = 1
+    kvs = {}
+
+    for kv in range(body[0]):
+      consumed, (key, val) = cls.decode_kv(body[offset:])
+      offset += consumed
+      kvs[key] = val
+
+    return offset, kvs
+
+  @classmethod
+  def decode_body(cls, tag, body):
+    consumed, kvs = self.decode_kvs(body)
+
+    trace_id = kvs.get(cls.TRACE_ID)
+    if trace_id:
+      trace_id = TraceId.decode(trace_id)
+
+    trace_flag = kvs.get(cls.TRACE_FLAG)
+    if trace_flag:
+      trace_flag = TraceFlag.decode(trace_flag)
+
+    return cls(tag, body[consumed:], trace_id=trace_id, trace_flag=trace_flag)
 
   def __init__(self, tag, body, trace_id=None, trace_flag=None):
     super(Treq, self).__init__(tag)
@@ -212,6 +244,15 @@ class Treq(Packet):
 
 
 class Rreq(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    status = body[0]
+
+    if status not in (Status.OK, Status.ERROR, Status.NACK):
+      raise ValueError('Got an unknown status type: 0x%x' % status)
+
+    return cls(tag, status, body[1:])
+
   def __init__(self, tag, status, body):
     super(Rreq, self).__init__(tag)
     self.status = status
@@ -241,6 +282,14 @@ class RreqNack(Rreq):
 
 
 class Tdispatch(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    consumed_contexts, contexts = Fragment.decode_contexts(body)
+    consumed_dest, dest = Fragment.decode_s2(body[consumed_contexts:])
+    consumed_dtab, dtab = Fragment.decode_contexts(body[consumed_contexts + consumed_dest:])
+    body = body[consumed_contexts + consumed_dest + consumed_dtab:]
+    return cls(tag, contexts, dest, Dtab(dtab), body)
+
   def __init__(self, tag, contexts, dst, dtab, body):
     super(Tdispatch, self).__init__(tag)
     self.contexts, self.dst, self.dtab, self.body = contexts, dst, dtab, body
@@ -256,6 +305,18 @@ class Tdispatch(Packet):
 
 
 class Rdispatch(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    status = body[0]
+
+    if status not in (Status.OK, Status.ERROR, Status.NACK):
+      raise ValueError('Got an unknown status type: 0x%x' % status)
+
+    consumed, contexts = Fragment.decode_contexts(body[1:])
+    body = body[1 + consumed:]
+
+    return cls(tag, status, contexts, body)
+
   def __init__(self, tag, status, contexts, body):
     super(Rdispatch, self).__init__(tag)
     self.status, self.contexts, self.body = status, contexts, body
@@ -285,6 +346,12 @@ class RdispatchNack(Rdispatch):
 
 
 class Tdrain(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    if body:
+      raise ValueError('Tdrain expects empty body.')
+    return cls(tag)
+
   def __init__(self, tag):
     super(Tdrain, self).__init__(tag)
 
@@ -293,6 +360,12 @@ class Tdrain(Packet):
 
 
 class Rdrain(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    if body:
+      raise ValueError('Rdrain expects empty body.')
+    return cls(tag)
+
   def __init__(self, tag):
     super(Rdrain, self).__init__(tag)
 
@@ -301,6 +374,12 @@ class Rdrain(Packet):
 
 
 class Tping(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    if body:
+      raise ValueError('Tping expects empty body.')
+    return cls(tag)
+
   def __init__(self, tag):
     super(Tping, self).__init__(tag)
 
@@ -309,6 +388,12 @@ class Tping(Packet):
 
 
 class Rping(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    if body:
+      raise ValueError('Rping expects empty body.')
+    return cls(tag)
+
   def __init__(self, tag):
     super(Rping, self).__init__(tag)
 
@@ -317,6 +402,10 @@ class Rping(Packet):
 
 
 class Rerr(Packet):
+  @classmethod
+  def decode_body(cls, tag, body):
+    return cls(tag, body.decode('utf-8'))
+
   def __init__(self, tag, error):
     super(Rerr, self).__init__(tag)
     self.error = error
@@ -327,8 +416,8 @@ class Rerr(Packet):
 
 class Tdiscarded(Packet):
   @classmethod
-  def decode(cls, buf, tag):
-    return cls(tag, buf.decode('utf-8'))
+  def decode_body(cls, tag, body):
+    return cls(tag, body.decode('utf-8'))
 
   def __init__(self, tag, why):
     super(Tdiscarded, self).__init__(tag)
