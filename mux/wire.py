@@ -110,7 +110,7 @@ class Fragments(object):
     length = struct.unpack('>I', buf[0:4])
 
     if len(buf) < 4 + length:
-      raise ValueError('Buffer is truncated (expected packet length %d)' % lengt)bh
+      raise ValueError('Buffer is truncated (expected packet length %d)' % length)
 
     return length + 4, Packet.decode(buf[4:length+4])
 
@@ -147,7 +147,7 @@ class Packet(object):
 
   @classmethod
   def register(cls, typ, impl):
-    cls.DECODE_TABLE[typ] = impl
+    cls.IMPLS[typ] = impl
 
   def __init__(self, tag):
     self.tag = tag
@@ -196,7 +196,7 @@ class Treq(Packet):
       self.encode_header(Message.T_REQ),
       self.encode_kvs(kvs),
       self.body
-    ]
+    ])
 
 
 class Rreq(Packet):
