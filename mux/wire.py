@@ -1,5 +1,7 @@
 import struct
 
+from .dtab import Dtab
+
 
 class Status(object):
   OK = 0
@@ -55,8 +57,6 @@ class TraceFlag(object):
 
 
 class Fragments(object):
-  MAX_STRING_LENGTH = 2**24
-
   @classmethod
   def decode_string(cls, fmt, width, buf):
     if len(buf) < width:
@@ -67,7 +67,7 @@ class Fragments(object):
     if len(buf) < width + length:
       raise ValueError('Buffer is truncated (expected string length %d)' % length)
 
-    return length + width, buf[width:length+width].decode('utf-8')
+    return length + width, buf[width:length + width].decode('utf-8')
 
   @classmethod
   def decode_s1(cls, buf):
@@ -112,21 +112,21 @@ class Fragments(object):
     if len(buf) < 4 + length:
       raise ValueError('Buffer is truncated (expected packet length %d)' % length)
 
-    return length + 4, Packet.decode(buf[4:length+4])
+    return length + 4, Packet.decode(buf[4:length + 4])
 
   @classmethod
   def encode_context(cls, key, value):
     return b''.join([
-      struct.pack('>H', len(key)),
-      key,
-      struct.pack('>H', len(value)),
-      value,
+        struct.pack('>H', len(key)),
+        key,
+        struct.pack('>H', len(value)),
+        value,
     ])
 
   @classmethod
   def encode_contexts(cls, contexts):
     return struct.pack('>H', len(contexts)) + b''.join(
-        self.encode_context(k, v) for (k, v) in contexts)
+        cls.encode_context(k, v) for (k, v) in contexts)
 
 
 class Packet(object):
@@ -203,7 +203,7 @@ class Treq(Packet):
 
   @classmethod
   def decode_body(cls, tag, body):
-    consumed, kvs = self.decode_kvs(body)
+    consumed, kvs = cls.decode_kvs(body)
 
     trace_id = kvs.get(cls.TRACE_ID)
     if trace_id:
@@ -230,16 +230,16 @@ class Treq(Packet):
   def encode(self):
     if self.trace_id:
       kvs = [
-        (self.TRACE_ID, self.trace_id.encode()),
-        (self.TRACE_FLAG, self.trace_flag.encode()),
+          (self.TRACE_ID, self.trace_id.encode()),
+          (self.TRACE_FLAG, self.trace_flag.encode()),
       ]
     else:
       kvs = []
 
     return bytearray().join([
-      self.encode_header(Message.T_REQ),
-      self.encode_kvs(kvs),
-      self.body
+        self.encode_header(Message.T_REQ),
+        self.encode_kvs(kvs),
+        self.body
     ])
 
 
@@ -260,9 +260,9 @@ class Rreq(Packet):
 
   def encode(self):
     return bytearray().join([
-      self.encode_header(Message.R_REQ),
-      struct.pack('B', self.status),
-      self.body,
+        self.encode_header(Message.R_REQ),
+        struct.pack('B', self.status),
+        self.body,
     ])
 
 
@@ -284,9 +284,9 @@ class RreqNack(Rreq):
 class Tdispatch(Packet):
   @classmethod
   def decode_body(cls, tag, body):
-    consumed_contexts, contexts = Fragment.decode_contexts(body)
-    consumed_dest, dest = Fragment.decode_s2(body[consumed_contexts:])
-    consumed_dtab, dtab = Fragment.decode_contexts(body[consumed_contexts + consumed_dest:])
+    consumed_contexts, contexts = Fragments.decode_contexts(body)
+    consumed_dest, dest = Fragments.decode_s2(body[consumed_contexts:])
+    consumed_dtab, dtab = Fragments.decode_contexts(body[consumed_contexts + consumed_dest:])
     body = body[consumed_contexts + consumed_dest + consumed_dtab:]
     return cls(tag, contexts, dest, Dtab(dtab), body)
 
@@ -296,11 +296,11 @@ class Tdispatch(Packet):
 
   def encode(self):
     return bytearray().join([
-      self.encode_header(Message.T_DISPATCH),
-      Fragment.encode_contexts(self.contexts),
-      Fragment.encode_s2(self.dst),
-      Fragment.encode_contexts(self.dtab),
-      self.body,
+        self.encode_header(Message.T_DISPATCH),
+        Fragments.encode_contexts(self.contexts),
+        Fragments.encode_s2(self.dst),
+        Fragments.encode_contexts(self.dtab),
+        self.body,
     ])
 
 
@@ -312,7 +312,7 @@ class Rdispatch(Packet):
     if status not in (Status.OK, Status.ERROR, Status.NACK):
       raise ValueError('Got an unknown status type: 0x%x' % status)
 
-    consumed, contexts = Fragment.decode_contexts(body[1:])
+    consumed, contexts = Fragments.decode_contexts(body[1:])
     body = body[1 + consumed:]
 
     return cls(tag, status, contexts, body)
@@ -323,10 +323,10 @@ class Rdispatch(Packet):
 
   def encode(self):
     return bytearray().join([
-      self.encode_header(Message.R_DISPATCH),
-      struct.pack('B', self.status),
-      Fragment.encode_contexts(self.contexts),
-      self.body,
+        self.encode_header(Message.R_DISPATCH),
+        struct.pack('B', self.status),
+        Fragments.encode_contexts(self.contexts),
+        self.body,
     ])
 
 

@@ -1,0 +1,2 @@
+class Dtab(object):
+  pass
