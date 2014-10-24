@@ -62,7 +62,7 @@ class Fragments(object):
     if len(buf) < width:
       raise ValueError('Buffer too small to contain string.')
 
-    length = struct.unpack(fmt, buf[0:width])
+    length, = struct.unpack(fmt, buf[0:width])
 
     if len(buf) < width + length:
       raise ValueError('Buffer is truncated (expected string length %d)' % length)
@@ -107,7 +107,7 @@ class Fragments(object):
     if len(buf) < 4:
       raise ValueError('Buffer too small to contain packet.')
 
-    length = struct.unpack('>I', buf[0:4])
+    length, = struct.unpack('>I', buf[0:4])
 
     if len(buf) < 4 + length:
       raise ValueError('Buffer is truncated (expected packet length %d)' % length)
@@ -134,16 +134,18 @@ class Packet(object):
 
   @classmethod
   def decode(cls, buf):
-    if len(buf) == 0:
-      raise ValueError('Buffer should be nonzero size.')
+    if len(buf) < 4:
+      raise ValueError('Buffer insufficient size for message.')
 
-    typ = struct.unpack('b', buf[0])
+    typ, = struct.unpack('b', buf[0])
+    tag, = struct.unpack('>I', b'\x00' + buf[1:4])
+
     impl = cls.IMPLS.get(typ)
 
     if impl is None:
-      raise ValueError('Unknown Tmessage 0x%x' % typ)
+      raise ValueError('Unknown Tmessage 0x%x with tag 0x%x' % (typ, tag))
 
-    return impl.decode(buf)
+    return impl.decode(buf[4:], tag)
 
   @classmethod
   def register(cls, typ, impl):
@@ -170,6 +172,10 @@ class Treq(Packet):
   @classmethod
   def encode_kvs(cls, kvs):
     return struct.pack('B', len(kvs)) + b''.join(cls.encode_kv(kv) for kv in kvs)
+
+  @classmethod
+  def decode(cls, buf):
+    pass
 
   def __init__(self, tag, body, trace_id=None, trace_flag=None):
     super(Treq, self).__init__(tag)
@@ -306,7 +312,7 @@ class Rping(Packet):
 
 class Rerr(Packet):
   def __init__(self, tag, error):
-    super(Rerr, self).__init__(self.tag)
+    super(Rerr, self).__init__(tag)
     self.error = error
 
   def encode(self):
@@ -314,8 +320,12 @@ class Rerr(Packet):
 
 
 class Tdiscarded(Packet):
+  @classmethod
+  def decode(cls, buf, tag):
+    return cls(tag, buf.decode('utf-8'))
+
   def __init__(self, tag, why):
-    super(Tdiscarded, self).__init__(self.tag)
+    super(Tdiscarded, self).__init__(tag)
     self.why = why
 
   def encode(self):
