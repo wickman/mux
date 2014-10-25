@@ -1,3 +1,4 @@
+from mux.dtab import Dtab
 from mux.wire import (
     Packet,
     RdispatchError,
@@ -111,7 +112,7 @@ def test_tdispatch(tag):
   for contexts in [(), (('foo', 'bar'),), (('foo', 'bar'), ('bork', 'bonk'))]:
     for body in ['', 'baz']:
       for dest in ['/wat', '/x/y/z']:
-        msg = Tdispatch(tag, contexts, dest, (), body.encode('utf-8'))
+        msg = Tdispatch(tag, contexts, dest, Dtab.empty(), body.encode('utf-8'))
         msg2 = Packet.decode(msg.encode())
         assert msg.tag == msg2.tag
         assert msg.dest == msg2.dest

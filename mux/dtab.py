@@ -7,5 +7,20 @@ class Dentry(object):
     return isinstance(other, Dentry) and self.path == other.path and self.tree == other.tree
 
 
-class Dtab(tuple):
-  pass
+class Dtab(object):
+  @classmethod
+  def empty(cls):
+    return cls([])
+
+  def __init__(self, entries):
+    self.entries = entries
+
+  def __eq__(self, other):
+    # TODO(wickman) This should be made more sophisticated, obv.
+    return isinstance(other, Dtab) and self.entries == other.entries
+
+  def __iter__(self):
+    return iter(self.entries)
+
+  def __len__(self):
+    return len(self.entries)

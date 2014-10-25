@@ -106,7 +106,7 @@ def parse_path(string):
     if not buf.maybe_eat('/'):
       break
 
-  return Path(labels)
+  return Path(*labels)
 
 
 def parse_dentry(string):
