@@ -1,2 +1,2 @@
-class Dtab(object):
+class Dtab(tuple):
   pass

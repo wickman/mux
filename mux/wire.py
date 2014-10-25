@@ -116,11 +116,14 @@ class Fragments(object):
 
   @classmethod
   def encode_context(cls, key, value):
+    raw_key = key.encode('utf-8')
+    raw_value = value.encode('utf-8')
+
     return b''.join([
-        struct.pack('>H', len(key)),
-        key,
-        struct.pack('>H', len(value)),
-        value,
+        struct.pack('>H', len(raw_key)),
+        raw_key,
+        struct.pack('>H', len(raw_value)),
+        raw_value,
     ])
 
   @classmethod
@@ -320,15 +323,19 @@ class Tdispatch(Packet):
     body = body[consumed_contexts + consumed_dest + consumed_dtab:]
     return cls(tag, contexts, dest, Dtab(dtab), body)
 
-  def __init__(self, tag, contexts, dst, dtab, body):
+  def __init__(self, tag, contexts, dest, dtab, body):
     super(Tdispatch, self).__init__(tag)
-    self.contexts, self.dst, self.dtab, self.body = tuple(contexts), dst, dtab, body
+
+    if not isinstance(body, (bytearray, bytes)):
+      raise TypeError('body must be of type bytes or a bytearray.')
+
+    self.contexts, self.dest, self.dtab, self.body = tuple(contexts), dest, dtab, body
 
   def encode(self):
     return bytearray().join([
         self.encode_header(Message.T_DISPATCH),
         Fragments.encode_contexts(self.contexts),
-        Fragments.encode_s2(self.dst),
+        Fragments.encode_s2(self.dest),
         Fragments.encode_contexts(self.dtab),
         self.body,
     ])
@@ -349,6 +356,10 @@ class Rdispatch(Packet):
 
   def __init__(self, tag, status, contexts, body):
     super(Rdispatch, self).__init__(tag)
+
+    if not isinstance(body, (bytearray, bytes)):
+      raise TypeError('body must be of type bytes or a bytearray.')
+
     self.status, self.contexts, self.body = status, tuple(contexts), body
 
   def encode(self):
@@ -372,7 +383,7 @@ class RdispatchError(Rdispatch):
 
 class RdispatchNack(Rdispatch):
   def __init__(self, tag, contexts):
-    super(RdispatchOk, self).__init__(tag, Status.NACK, contexts, b'')
+    super(RdispatchNack, self).__init__(tag, Status.NACK, contexts, b'')
 
 
 class Tdrain(Packet):
