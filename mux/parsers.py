@@ -193,3 +193,11 @@ def parse_tree(string):
     return NameTree.Alt(*trees)
   else:
     return trees[0]
+
+
+__all__ = (
+    'parse_dentry',
+    'parse_dtab',
+    'parse_path',
+    'parse_tree',
+)
