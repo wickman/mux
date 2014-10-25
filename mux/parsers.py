@@ -1,7 +1,16 @@
+from .dtab import Dtab, Dentry
+from .name_tree import NameTree
 from .path import Path
 
 
 class Buffer(object):
+  @classmethod
+  def wrap(cls, buf):
+    if isinstance(buf, cls):
+      return buf
+    else:
+      return cls(buf)
+
   def __init__(self, buf):
     self.buf = buf
     self.index = 0
@@ -59,18 +68,17 @@ def parse_hex(buf):
   return int(ch, 16)
 
 
-def parse_label(buf):
+def parse_label(string):
+  buf = Buffer.wrap(string)
   label = ''
 
   while True:
     ch = buf.peek()
 
     if Patterns.is_showable(ch):
-      print('showable: %s' % ch)
       label += ch
       buf.next()
     elif ch == '\\':
-      print('slash: %s' % ch)
       buf.next()
       buf.eat('x')
       fst = parse_hex(buf)
@@ -84,13 +92,11 @@ def parse_label(buf):
 
 
 def parse_path(string):
-  buf = Buffer(string)
-
+  buf = Buffer.wrap(string)
   buf.eat_whitespace()
   buf.eat('/')
 
   if not Patterns.is_label_char(buf.peek()):
-    print('not label char: %s' % buf.peek())
     return Path.empty()
 
   labels = []
@@ -103,12 +109,87 @@ def parse_path(string):
   return Path(labels)
 
 
-
 def parse_dentry(string):
-  pass
+  buf = Buffer.wrap(string)
+  path = parse_path(buf)
+  buf.eat_whitespace()
+  buf.eat('=')
+  buf.eat('>')
+  tree = parse_tree(buf)
+  return Dentry(path, tree)
 
 
-def parase_dtab(string):
-  pass
+def parse_dtab(string):
+  buf = Buffer.wrap(string)
+  dentries = []
+
+  while True:
+    buf.eat_whitespace()
+    if not buf.at_end():
+      dentries.append(parse_dentry(buf))
+      buf.eat_whitespace()
+    if not buf.maybe_eat(';'):
+      break
+
+  return Dtab(dentries)
 
 
+def parse_tree1(string):
+  buf = Buffer.wrap(string)
+
+  trees = []
+
+  while True:
+    trees.append(parse_simple(buf))
+    buf.eat_whitespace()
+    if not buf.maybe_eat('&'):
+      break
+
+  if len(trees) > 1:
+    return NameTree.Union(*trees)
+  else:
+    return trees[0]
+
+
+def parse_simple(string):
+  buf = Buffer.wrap(string)
+
+  buf.eat_whitespace()
+  ch = buf.peek()
+
+  if ch == '(':
+    buf.next()
+    tree = parse_tree(buf)
+    buf.eat_whitespace()
+    buf.eat(')')
+    return tree
+  elif ch == '/':
+    return NameTree.Leaf(parse_path(buf))
+  elif ch == '!':
+    buf.next()
+    return NameTree.Fail
+  elif ch == '~':
+    buf.next()
+    return NameTree.Neg
+  elif ch == '$':
+    buf.next()
+    return NameTree.Empty
+  else:
+    raise ValueError('Failed to parse NameTree.')
+
+
+def parse_tree(string):
+  buf = Buffer.wrap(string)
+
+  trees = []
+
+  while True:
+    trees.append(parse_tree1(buf))
+    buf.eat_whitespace()
+    if not buf.maybe_eat('|'):
+      break
+
+  if len(trees) > 1:
+    return NameTree.Alt(*trees)
+  else:
+    return trees[0]
