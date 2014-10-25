@@ -33,8 +33,19 @@ class Message(object):
 class TraceId(object):
   __slots__ = ('span_id', 'parent_id', 'trace_id')
 
+  @classmethod
+  def decode(cls, body):
+    if len(body) < 24:
+      raise ValueError('Buffer is not large enough to decode TraceId')
+    span_id, parent_id, trace_id = struct.unpack('>QQQ', body[0:24])
+    return cls(span_id, parent_id, trace_id)
+
   def __init__(self, span_id, parent_id, trace_id):
     self.span_id, self.parent_id, self.trace_id = span_id, parent_id, trace_id
+
+  def __eq__(self, other):
+    return isinstance(other, TraceId) and (self.span_id, self.parent_id, self.trace_id) == (
+        other.span_id, other.parent_id, other.trace_id)
 
   def encode(self):
     return struct.pack('>QQQ', self.span_id, self.parent_id, self.trace_id)
@@ -49,8 +60,17 @@ class TraceFlag(object):
   def default(cls):
     return cls(0)
 
+  @classmethod
+  def decode(cls, body):
+    if len(body) < 1:
+      raise ValueError('Could not decode TraceFlag.')
+    return cls(body[0])
+
   def __init__(self, flags):
     self.flags = flags
+
+  def __eq__(self, other):
+    return isinstance(other, TraceFlag) and self.flags == other.flags
 
   def encode(self):
     return struct.pack('B', self.flags)
@@ -469,17 +489,20 @@ class Tdiscarded(Packet):
 
 
 class Tlease(Packet):
-  @classmethod
-  def from_timestamp(cls, timestamp):
-    pass
+  MILLISECONDS = 1
 
   @classmethod
-  def from_amount(cls, duration):
-    pass
+  def decode_body(cls, tag, body):
+    if len(body) < 9:
+      raise ValueError('Insufficient data to decode Tlease.')
+    unit, length = struct.unpack('>BQ', body[0:9])
+    return cls(tag, unit, length)
 
   def __init__(self, tag, unit, length):
     super(Tlease, self).__init__(tag)
     self.unit, self.length = unit, length
+    if self.unit not in (self.MILLISECONDS,):
+      raise ValueError('Unknown unit type %d' % self.unit)
 
   def encode(self):
     return bytearray().join([

@@ -6,12 +6,16 @@ from mux.wire import (
     Rdrain,
     Rerr,
     Rping,
-    Rreq,
+    RreqError,
+    RreqNack,
+    RreqOk,
     Tdiscarded,
     Tdispatch,
     Tdrain,
     Tlease,
     Tping,
+    TraceFlag,
+    TraceId,
     Treq,
 )
 
@@ -19,11 +23,20 @@ import pytest
 
 
 SHORT_MAX = 2 ** 24 - 1
+ULL_MAX = 2 ** 64 - 1
 
 
 @pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
-def test_tlease(tag):
-  pass
+@pytest.mark.randomize(('length', 'int'), min_num=0, max_num=ULL_MAX)
+def test_tlease(tag, length):
+  msg = Tlease(tag, 1, length)
+  msg2 = Packet.decode(msg.encode())
+  assert msg.tag == msg2.tag
+  assert msg.unit == msg2.unit
+  assert msg.length == msg2.length
+
+  with pytest.raises(ValueError):
+    Tlease(tag, 0, length)
 
 
 @pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
@@ -109,9 +122,51 @@ def test_tdispatch(tag):
 
 @pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
 def test_treq(tag):
-  pass
+  def assert_equiv(msg1, msg2):
+    assert msg1.tag == msg2.tag
+    assert msg1.body == msg2.body
+    assert msg1.trace_id == msg2.trace_id
+    assert msg1.trace_flag == msg2.trace_flag
+
+  for body in (b'', b'foo'):
+    # w/o traces
+    msg = Treq(tag, body)
+    msg2 = Packet.decode(msg.encode())
+    assert_equiv(msg, msg2)
+
+    # w/ traces
+    trace_id = TraceId(1, 2, 3)
+    msg = Treq(tag, body, trace_id=trace_id)
+    msg2 = Packet.decode(msg.encode())
+    assert_equiv(msg, msg2)
+
+    for trace_flag in TraceFlag.default(), TraceFlag.debug():
+      msg = Treq(tag, body, trace_id=trace_id, trace_flag=trace_flag)
+      msg2 = Packet.decode(msg.encode())
+      assert_equiv(msg, msg2)
+
+    with pytest.raises(ValueError):
+      # must specify trace_id
+      Treq(tag, body, trace_flag=TraceFlag.debug())
 
 
 @pytest.mark.randomize(('tag', 'int'), min_num=0, max_num=SHORT_MAX)
 def test_rreq(tag):
-  pass
+  def assert_equiv(msg1, msg2):
+    assert msg1.tag == msg2.tag
+    assert msg1.status == msg2.status
+    assert msg1.body == msg2.body
+
+  for body in ('', 'baz'):
+    msg = RreqOk(tag, body.encode('utf-8'))
+    msg2 = Packet.decode(msg.encode())
+    assert_equiv(msg, msg2)
+
+    msg = RreqError(tag, body.encode('utf-8'))
+    msg2 = Packet.decode(msg.encode())
+    assert_equiv(msg, msg2)
+
+    msg = RreqNack(tag)
+    msg2 = Packet.decode(msg.encode())
+    assert_equiv(msg, msg2)
+
