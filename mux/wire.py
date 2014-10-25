@@ -523,3 +523,18 @@ Packet.register(Message.R_PING, Rping)
 Packet.register(Message.T_DISCARDED, Tdiscarded)
 Packet.register(Message.T_LEASE, Tlease)
 Packet.register(Message.R_ERR, Rerr)
+
+
+def frame(packet):
+  body = packet.encode()
+  return struct.pack('>I', len(body)) + body
+
+
+def unframe(body):
+  if len(body) < 4:
+    raise ValueError('Insufficient body to unframe a packet.')
+
+  length = struct.unpack('>I', body[0:4])
+  packet = Packet.decode(body[4:length + 4])
+
+  return length + 4, packet

@@ -1,0 +1,2 @@
+class NameTree(object):
+  pass

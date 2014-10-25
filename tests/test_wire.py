@@ -97,7 +97,7 @@ def test_rdispatch(tag):
       msg2 = Packet.decode(msg.encode())
       assert_equiv(msg, msg2)
 
-      msg = RdispatchError(tag, contexts, body.encode('utf-8'))
+      msg = RdispatchError(tag, contexts, body)
       msg2 = Packet.decode(msg.encode())
       assert_equiv(msg, msg2)
 
@@ -111,7 +111,7 @@ def test_tdispatch(tag):
   for contexts in [(), (('foo', 'bar'),), (('foo', 'bar'), ('bork', 'bonk'))]:
     for body in ['', 'baz']:
       for dest in ['/wat', '/x/y/z']:
-        msg = Tdispatch(tag, contexts, dest, (), body)
+        msg = Tdispatch(tag, contexts, dest, (), body.encode('utf-8'))
         msg2 = Packet.decode(msg.encode())
         assert msg.tag == msg2.tag
         assert msg.dest == msg2.dest
@@ -162,7 +162,7 @@ def test_rreq(tag):
     msg2 = Packet.decode(msg.encode())
     assert_equiv(msg, msg2)
 
-    msg = RreqError(tag, body.encode('utf-8'))
+    msg = RreqError(tag, body)
     msg2 = Packet.decode(msg.encode())
     assert_equiv(msg, msg2)
 
